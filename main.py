@@ -63,4 +63,4 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
 
 if __name__ == '__main__':
     main(
-        "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks", resume=False)
+        "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks", resume=True)
