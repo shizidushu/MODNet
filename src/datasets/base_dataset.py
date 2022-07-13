@@ -91,7 +91,7 @@ class BaseDataset(Dataset):
         img = img / 255.0
         img = normalize(img)
         
-        return self.imgs[index], img, mask, trimap
+        return self.imgs[index], img, trimap, mask
 
 
     

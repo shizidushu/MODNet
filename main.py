@@ -23,7 +23,7 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
     modnet = modnet.cuda()
     modnet.load_state_dict(torch.load(pretrained_ckpt))
     
-    bs = 4  # batch size
+    bs = 22  # batch size
     lr = 0.01  # learn rate
     epochs = 1000  # total epochs
     num_workers = 16
@@ -34,13 +34,17 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
     dataset = BaseDataset(root_dir, image_dir= "images", mask_dir="masks", transform=train_transform)
     dataloader = DataLoader(dataset, batch_size=bs, num_workers=num_workers, pin_memory=True)
 
-    for epoch in range(0, epochs):
+    if resume:
+        start_epoch = int(VModel.split(".")[0].split('_')[-1]) + 1
+    else:
+        start_epoch = 0
+
+    for epoch in range(start_epoch, epochs):
         mattes = []
         for idx, (img_file, image, trimap, gt_matte) in enumerate(dataloader):
             image = image.cuda()
             gt_matte = gt_matte.cuda()
             trimap = trimap.cuda()
-
             semantic_loss, detail_loss, matte_loss = supervised_training_iter(
                 modnet, optimizer, image, trimap, gt_matte
             )
@@ -59,4 +63,4 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
 
 if __name__ == '__main__':
     main(
-        "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks")
+        "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks", resume=False)
