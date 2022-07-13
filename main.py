@@ -9,14 +9,14 @@ from src.trainer import supervised_training_iter, soc_adaptation_iter
 import numpy as np
 import copy
 
-def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', resume=False):
+def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', resume=False, batch_size = 22):
     modnet = MODNet()
     modnet = nn.DataParallel(modnet)
     if resume:
         VModel = sorted(os.listdir(output_dir))[-1]
         pretrained_ckpt = os.path.join(output_dir, VModel)
     else:
-        pretrained_ckpt = './modnet_webcam_portrait_matting.ckpt'
+        pretrained_ckpt = '/home/ubuntu/data/yong/projects/MODNet/pretrained/modnet_photographic_portrait_matting.ckpt'
     
     print(pretrained_ckpt)
     logging.info(f"model load {pretrained_ckpt}")
@@ -24,8 +24,8 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
     modnet = modnet.cuda()
     modnet.load_state_dict(torch.load(pretrained_ckpt))
     
-    bs = 22  # batch size
-    lr = 0.01  # learn rate
+    bs = batch_size  # batch size
+    lr = 0.00001  # learn rate
     epochs = 1000  # total epochs
     num_workers = 16
     optimizer = torch.optim.SGD(modnet.parameters(), lr=lr, momentum=0.9)
@@ -113,3 +113,5 @@ if __name__ == '__main__':
         "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks", resume=True)
     # main_soc(
     #     "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks")
+    # main(
+    #     "/home/ubuntu/data/yong/projects/P3M/data/P3M-10k/train", image_dir= "blurred_image", mask_dir="mask", resume=True, batch_size=20)
