@@ -5,8 +5,9 @@ import os
 import logging
 from src.datasets.base_dataset import BaseDataset, MattingTransform
 from torch.utils.data import Dataset, DataLoader
-from src.trainer import supervised_training_iter
+from src.trainer import supervised_training_iter, soc_adaptation_iter
 import numpy as np
+import copy
 
 def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', resume=False):
     modnet = MODNet()
@@ -31,7 +32,7 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10,
                                                    gamma=0.1)  # step_size 学习率下降迭代间隔次数， default: 每10次降低一次学习率
     train_transform = MattingTransform()
-    dataset = BaseDataset(root_dir, image_dir= "images", mask_dir="masks", transform=train_transform)
+    dataset = BaseDataset(root_dir, image_dir= image_dir, mask_dir=mask_dir, transform=train_transform)
     dataloader = DataLoader(dataset, batch_size=bs, num_workers=num_workers, pin_memory=True)
 
     if resume:
@@ -61,6 +62,54 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
         logging.info(f'------save model------{epoch}  {epoch}.ckpt')
 
 
+def main_soc(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/ubuntu/data/yong/projects/MODNet/output'):
+    modnet = MODNet()
+    modnet = nn.DataParallel(modnet)
+
+    VModel = sorted(os.listdir(output_dir))[-1]
+    pretrained_ckpt = os.path.join(output_dir, VModel)
+    
+    print(pretrained_ckpt)
+    logging.info(f"model load {pretrained_ckpt}")
+
+    modnet = modnet.cuda()
+    modnet.load_state_dict(torch.load(pretrained_ckpt))
+    
+    bs = 18  # batch size
+    lr = 0.00001  # learn rate
+    epochs = 60  # total epochs
+    num_workers = 16
+    optimizer = torch.optim.Adam(modnet.parameters(), lr=lr, betas=(0.9, 0.99))
+    # train_transform = MattingTransform()
+    dataset = BaseDataset(root_dir, image_dir= image_dir, mask_dir=mask_dir)
+    dataloader = DataLoader(dataset, batch_size=bs, num_workers=num_workers, pin_memory=True)
+
+    start_epoch = int(VModel.split(".")[0].split('_')[-1]) + 1
+
+    for epoch in range(start_epoch, epochs):
+        semantic_loss=[]
+        detail_loss=[]
+        backup_modnet = copy.deepcopy(modnet)
+        for idx, (img_file, image, trimap, gt_matte) in enumerate(dataloader):
+            image = image.cuda()
+            soc_semantic_loss, soc_detail_loss = soc_adaptation_iter(modnet, backup_modnet, optimizer, image)
+
+            info = f"epoch: {epoch}/{epochs} soc_semantic_loss: {soc_semantic_loss}, soc_detail_loss: {soc_detail_loss}"
+            if soc_semantic_loss > 1 or soc_detail_loss>1:
+                print(idx, info)
+            print(idx, info)
+            semantic_loss.append(float(soc_semantic_loss))
+            detail_loss.append(float(soc_detail_loss))
+        avg_semantic_loss = float(np.mean(semantic_loss))
+        avg_detail_loss = float(np.mean(detail_loss))
+        logging.info(f"epoch: {epoch}/{epochs}, avg_semantic_loss: {avg_semantic_loss}, avg_detail_loss: {avg_detail_loss}")
+        torch.save(modnet.state_dict(), os.path.join(output_dir, 'soc_{:0>2d}.ckpt'.format(epoch)))
+        print(f'------save soc model------{epoch}  {epoch}.ckpt')
+
+
+
 if __name__ == '__main__':
     main(
         "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks", resume=True)
+    # main_soc(
+    #     "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks")

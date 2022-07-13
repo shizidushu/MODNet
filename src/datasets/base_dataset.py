@@ -77,6 +77,9 @@ class BaseDataset(Dataset):
 
         if self.transform is not None:
             img, mask = self.transform(img, mask, target_size = self.target_size)
+        else:
+            img = cv2.resize(img, (self.target_size, self.target_size), interpolation=cv2.INTER_AREA)
+            mask = cv2.resize(mask, (self.target_size, self.target_size), interpolation=cv2.INTER_AREA)
         
         trimap = self.gen_trimap(mask)
 
@@ -85,11 +88,7 @@ class BaseDataset(Dataset):
         trimap = torch.from_numpy(trimap.astype(np.float32)[np.newaxis, :, :])
 
 
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
-
-        img = img / 255.0
-        img = normalize(img)
+        img = img / 127.5 - 1
         
         return self.imgs[index], img, trimap, mask
 
