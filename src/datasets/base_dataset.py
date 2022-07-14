@@ -15,8 +15,7 @@ class MattingTransform(object):
     def __init__(self) -> None:
         super(MattingTransform, self).__init__()
     
-    def __call__(self, img, mask, target_size = 512):
-        ref_size = target_size
+    def __call__(self, img, mask, ref_size = 512):
         # 将短边缩短到512
         im_h, im_w, im_c = img.shape
         if im_w >= im_h:
@@ -26,8 +25,8 @@ class MattingTransform(object):
             im_rw = ref_size
             im_rh = int(im_h / im_w * ref_size)
 
-        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_AREA)
-        mask = cv2.resize(mask, (im_rw, im_rh), interpolation=cv2.INTER_AREA)
+        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+        mask = cv2.resize(mask, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
 
         # 随机裁剪出512x512
         bigger_side = max(im_rw, im_rh)
@@ -48,10 +47,10 @@ class MattingTransform(object):
 
 
 class BaseDataset(Dataset):
-    def __init__(self, root_dir, image_dir = "image", mask_dir = "matte", transform = None, target_size = 512):
+    def __init__(self, root_dir, image_dir = "image", mask_dir = "matte", transform = None, ref_size = 512):
         self.root_dir = root_dir
         self.transform = transform
-        self.target_size = target_size
+        self.ref_size = ref_size
 
         self.imgs = sorted([os.path.join(self.root_dir, image_dir, img) for img in os.listdir(os.path.join(self.root_dir, image_dir))])
         self.masks = sorted([os.path.join(self.root_dir, mask_dir, aph) for aph in os.listdir(os.path.join(self.root_dir, mask_dir))])
@@ -81,8 +80,8 @@ class BaseDataset(Dataset):
     # def gen_trimap(self, matte):
     #     trimap = (matte >= 0.9).astype(np.float32)
     #     not_bg = (matte > 0).astype(np.float32)
-    #     d_size = self.target_size // 256 * random.randint(10, 20)
-    #     e_size = self.target_size // 256 * random.randint(10, 20)
+    #     d_size = self.ref_size // 256 * random.randint(10, 20)
+    #     e_size = self.ref_size // 256 * random.randint(10, 20)
     #     trimap[np.where((grey_dilation(not_bg, size=(d_size, d_size)) - grey_erosion(trimap, size=(e_size, e_size))) != 0)] = 0.5
     #     return trimap
     
@@ -108,10 +107,10 @@ class BaseDataset(Dataset):
             mask = mask / 255.0
 
         if self.transform is not None:
-            img, mask = self.transform(img, mask, target_size = self.target_size)
+            img, mask = self.transform(img, mask, ref_size = self.ref_size)
         else:
-            img = cv2.resize(img, (self.target_size, self.target_size), interpolation=cv2.INTER_AREA)
-            mask = cv2.resize(mask, (self.target_size, self.target_size), interpolation=cv2.INTER_AREA)
+            img = cv2.resize(img, (self.ref_size, self.ref_size), interpolation=cv2.INTER_AREA)
+            mask = cv2.resize(mask, (self.ref_size, self.ref_size), interpolation=cv2.INTER_AREA)
         
         trimap = self.gen_trimap(mask)
 

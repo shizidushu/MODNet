@@ -65,6 +65,7 @@ class ImagesDataset(Dataset):
 
     def load_item(self, idx):
         alpha = np.array(Image.open(self.alphas[idx]))  # cv2.imread(self.alphas[idx], -1), 防止libpng warning: iCCP
+        print(self.alphas[idx])
         alpha = alpha[..., -1] if len(alpha.shape) > 2 else alpha
         img_f = os.path.splitext(self.alphas[idx].replace('masks', 'images'))[0] + '.jpg'
         if not os.path.exists(img_f):
@@ -98,8 +99,8 @@ class ImagesDataset(Dataset):
             # img = img[y0:y0+self.ref_size, x0:x0+self.ref_size, ...]
             # alpha = alpha[y0:y0+self.ref_size, x0:x0+self.ref_size, ...]
             # random crop
-            x0 = random.randint(0, im_rw - self.ref_size + 1)
-            y0 = random.randint(0, im_rh - self.ref_size + 1)
+            x0 = random.randint(0, im_rw - self.ref_size)
+            y0 = random.randint(0, im_rh - self.ref_size)
             img = img[y0:y0 + self.ref_size, x0:x0 + self.ref_size, ...]
             alpha = alpha[y0:y0 + self.ref_size, x0:x0 + self.ref_size, ...]
 
@@ -116,6 +117,6 @@ class ImagesDataset(Dataset):
 
         if self.transform:
             img = self.transform(img)
-        alpha = self.tensor(alpha)
+        alpha = self.tensor(alpha.astype(np.float32))
         trimap = self.tensor(trimap)
         return self.alphas[idx], img, trimap, alpha
