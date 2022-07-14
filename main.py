@@ -5,28 +5,31 @@ import torch
 import torch.nn as nn
 import os
 import logging
-from src.datasets.base_dataset import BaseDataset, MattingTransform
-from src.datasets.images_dataset import ImagesDataset
+from src.datasets.base_dataset import BaseDataset
 from torch.utils.data import Dataset, DataLoader
 from src.trainer import supervised_training_iter, soc_adaptation_iter
 import numpy as np
 import copy
 
-def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', resume=False, batch_size = 22):
+def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', resume=False, batch_size = 22):
     modnet = MODNet()
     modnet = nn.DataParallel(modnet)
+
+    last_checkpoint = None
     if resume:
-        VModel = sorted(os.listdir(output_dir))[-1]
-        pretrained_ckpt = os.path.join(output_dir, VModel)
-    else:
-        pretrained_ckpt = '/home/ubuntu/data/yong/projects/MODNet/pretrained/modnet_webcam_portrait_matting.ckpt'
-    
-    print(pretrained_ckpt)
-    
+        checkpoints = [output_dir + "/" + name for name in os.listdir(output_dir)]
+        if len(checkpoints) > 0:
+            last_checkpoint = max(checkpoints, key=os.path.getctime)
 
     modnet = modnet.cuda()
-    logging.info(f"model load {pretrained_ckpt}")
+
+    pretrained_ckpt = '/home/ubuntu/data/yong/projects/MODNet/pretrained/modnet_webcam_portrait_matting.ckpt'
+    print(f"load pretrained {pretrained_ckpt}")
     modnet.load_state_dict(torch.load(pretrained_ckpt))
+
+    if last_checkpoint:
+        print(f"load last checkpoint {last_checkpoint}")
+        modnet.load_state_dict(torch.load(last_checkpoint))
     
     bs = batch_size  # batch size
     lr = 0.001  # learn rate
@@ -35,20 +38,10 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
     optimizer = torch.optim.SGD(modnet.parameters(), lr=lr, momentum=0.9)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10,
                                                    gamma=0.1)  # step_size 学习率下降迭代间隔次数， default: 每10次降低一次学习率
-    train_transform = MattingTransform()
-    dataset = BaseDataset(root_dir, image_dir= image_dir, mask_dir=mask_dir, transform=train_transform)
-    # torch_transforms = transforms.Compose(
-    #     [
-    #         transforms.ToTensor(),
-    #         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    #     ]
-    # )
-
-    # dataset = ImagesDataset("/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", transform=torch_transforms)
     dataloader = DataLoader(dataset, batch_size=bs, num_workers=num_workers, pin_memory=True)
 
-    if resume:
-        start_epoch = int(VModel.split(".")[0].split('_')[-1]) + 1
+    if resume and last_checkpoint is not None:
+        start_epoch = int(last_checkpoint.split(".")[0].split('_')[-1]) + 1
     else:
         start_epoch = 0
 
@@ -74,12 +67,13 @@ def main(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/
         logging.info(f'------save model------{epoch}  {epoch}.ckpt')
 
 
-def main_soc(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/home/ubuntu/data/yong/projects/MODNet/output'):
+def train_soc(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output'):
     modnet = MODNet()
     modnet = nn.DataParallel(modnet)
 
-    VModel = sorted(os.listdir(output_dir))[-1]
-    pretrained_ckpt = os.path.join(output_dir, VModel)
+    checkpoints = [output_dir + "/" + name for name in os.listdir(output_dir)]
+    pretrained_ckpt = max(checkpoints, key=os.path.getctime)
+
     
     print(pretrained_ckpt)
     logging.info(f"model load {pretrained_ckpt}")
@@ -92,14 +86,9 @@ def main_soc(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/h
     epochs = 60  # total epochs
     num_workers = 16
     optimizer = torch.optim.Adam(modnet.parameters(), lr=lr, betas=(0.9, 0.99))
-    train_transform = MattingTransform()
-    dataset = BaseDataset(root_dir, image_dir= image_dir, mask_dir=mask_dir)
     dataloader = DataLoader(dataset, batch_size=bs, num_workers=num_workers, pin_memory=True)
-    
 
-    start_epoch = int(VModel.split(".")[0].split('_')[-1]) + 1
-
-    for epoch in range(start_epoch, epochs):
+    for epoch in range(0, epochs):
         semantic_loss=[]
         detail_loss=[]
         backup_modnet = copy.deepcopy(modnet)
@@ -122,7 +111,9 @@ def main_soc(root_dir, image_dir = "image", mask_dir = "matte", output_dir = '/h
 
 
 if __name__ == '__main__':
-    # main("/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation", image_dir= "images", mask_dir="masks", resume=False)
-    main_soc("/home/ubuntu/data/yong/projects/MODNet", image_dir= "input", mask_dir="input")
-    # main(
-    #     "/home/ubuntu/data/yong/projects/P3M/data/P3M-10k/train", image_dir= "blurred_image", mask_dir="mask", resume=False, batch_size=20)
+    dataset = BaseDataset(
+        "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation",
+        "images",
+        "masks",
+        ref_size=512)
+    main(dataset, resume=True)

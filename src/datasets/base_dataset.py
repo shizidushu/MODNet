@@ -9,53 +9,32 @@ import torch
 import os
 import torch.nn.functional as F
 from PIL import Image
-
-
-class MattingTransform(object):
-    def __init__(self) -> None:
-        super(MattingTransform, self).__init__()
-    
-    def __call__(self, img, mask, ref_size = 512):
-        # 将短边缩短到512
-        im_h, im_w, im_c = img.shape
-        if im_w >= im_h:
-            im_rh = ref_size
-            im_rw = int(im_w / im_h * ref_size)
-        elif im_w < im_h:
-            im_rw = ref_size
-            im_rh = int(im_h / im_w * ref_size)
-
-        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
-        mask = cv2.resize(mask, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
-
-        # 随机裁剪出512x512
-        bigger_side = max(im_rw, im_rh)
-        rand_ind = random.randint(0, bigger_side - ref_size)
-
-        if im_rh > im_rw:
-            img = img[rand_ind:rand_ind+ref_size, :]
-            mask = mask[rand_ind:rand_ind+ref_size, :]
-        else:
-            img = img[:, rand_ind:rand_ind+ref_size]
-            mask = mask[:, rand_ind:rand_ind+ref_size]
-        
-        # 随机翻转
-        if random.random()<0.5:
-            img = cv2.flip(img, 1)
-            mask = cv2.flip(mask, 1)
-        return img, mask
-
+import glob
 
 class BaseDataset(Dataset):
-    def __init__(self, root_dir, image_dir = "image", mask_dir = "matte", transform = None, ref_size = 512):
+    def __init__(self, root_dir, img_dir = "image", alpha_dir = "masks", ref_size = 512):
         self.root_dir = root_dir
-        self.transform = transform
+        self.img_dir = img_dir
+        self.alpha_dir = alpha_dir
         self.ref_size = ref_size
 
-        self.imgs = sorted([os.path.join(self.root_dir, image_dir, img) for img in os.listdir(os.path.join(self.root_dir, image_dir))])
-        self.masks = sorted([os.path.join(self.root_dir, mask_dir, aph) for aph in os.listdir(os.path.join(self.root_dir, mask_dir))])
-        print(len(self.imgs))
-        assert len(self.imgs) == len(self.masks), 'the number of dataset is different, please check it.'
+        self.samples = []
+        self.add_samples(self.root_dir, self.img_dir, self.alpha_dir)
+    
+    def add_samples(self, root_dir, img_dir = "image", alpha_dir = "masks"):
+        alpha_path_pattern = os.path.sep.join([root_dir, alpha_dir, "*"])
+        alpha_paths = sorted(glob.glob(alpha_path_pattern))
+        for alpha_path in alpha_paths:
+            img_path = os.path.splitext(alpha_path.replace(alpha_dir, img_dir))[0] + '.jpg'
+            if not os.path.exists(img_path):
+                img_path = img_path.replace('.jpg', '.png')
+            if not os.path.exists(img_path):
+                print(f"Not found image for mask file: {alpha_path}")
+                continue
+            self.samples.append({
+                "img_path": img_path,
+                "alpha_path": alpha_path
+            })
 
     def gen_trimap(self, alpha):
         foreground = alpha > 0
@@ -70,65 +49,90 @@ class BaseDataset(Dataset):
         bbox_size = ((right - left) + (ylower - upper)) // 2
         d_size = bbox_size // 256 * random.randint(10, 20)  # dilate kernel size
         e_size = bbox_size // 256 * random.randint(10, 20)  # erode kernel size
-        alpha = alpha / 255.0  # numpy array of your matte (with values between [0, 1])
+        if np.amax(alpha) > 1:
+            alpha = alpha / 255.0 # numpy array of your matte (with values between [0, 1])
         trimap = (alpha >= 0.9).astype('float32')
         not_bg = (alpha > 0).astype('float32')
         trimap[np.where(
             (grey_dilation(not_bg, size=(d_size, d_size)) - grey_erosion(trimap, size=(e_size, e_size))) != 0)] = 0.5
         return trimap
-
-    # def gen_trimap(self, matte):
-    #     trimap = (matte >= 0.9).astype(np.float32)
-    #     not_bg = (matte > 0).astype(np.float32)
-    #     d_size = self.ref_size // 256 * random.randint(10, 20)
-    #     e_size = self.ref_size // 256 * random.randint(10, 20)
-    #     trimap[np.where((grey_dilation(not_bg, size=(d_size, d_size)) - grey_erosion(trimap, size=(e_size, e_size))) != 0)] = 0.5
-    #     return trimap
-    
-    # def getTrimap(self, alpha):
-    #     fg = np.array(np.equal(alpha, 255).astype(np.float32))
-    #     unknown = np.array(np.not_equal(alpha, 0).astype(np.float32))  # unknown = alpha > 0
-    #     unknown = unknown - fg
-    #     unknown = morphology.distance_transform_edt(unknown == 0) <= np.random.randint(1, 20)
-    #     trimap = fg
-    #     trimap[unknown] = 0.5
-    #     return trimap
-        # print(trimap[:, :, :1].shape)
-        # return trimap[:, :, :1]
     
     def __len__(self):
-        return len(self.imgs)
+        return len(self.samples)
     
     def __getitem__(self, index):
-        img = cv2.imread(self.imgs[index], cv2.IMREAD_COLOR)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        mask = cv2.imread(self.masks[index], cv2.IMREAD_GRAYSCALE)
-        if np.amax(mask) > 1:
-            mask = mask / 255.0
+        img_path = self.samples[index]["img_path"]
+        alpha_path = self.samples[index]["alpha_path"]
 
-        if self.transform is not None:
-            img, mask = self.transform(img, mask, ref_size = self.ref_size)
-        else:
-            img = cv2.resize(img, (self.ref_size, self.ref_size), interpolation=cv2.INTER_AREA)
-            mask = cv2.resize(mask, (self.ref_size, self.ref_size), interpolation=cv2.INTER_AREA)
+        img = Image.open(img_path)
+        img = np.asarray(img)
+        if len(img.shape) == 2:
+            img = img[:, :, None]
+        if img.shape[2] == 1:
+            img = np.repeat(img, 3, axis=2)
+        elif img.shape[2] == 4:
+            img = img[:, :, 0:3]
+
+        alpha = np.array(Image.open(alpha_path))
+        alpha = alpha[..., -1] if len(alpha.shape) > 2 else alpha
         
-        trimap = self.gen_trimap(mask)
+        img, alpha = self.resize_and_crop(img, alpha, self.ref_size)
+        
+        trimap = self.gen_trimap(alpha)
 
-        # 左右镜像增广
-        if np.random.binomial(1, 0.5) > 0:
-            img = img[:, ::-1, ...].copy()
-            mask = mask[:, ::-1, ...].copy()
-            trimap = trimap[:, ::-1, ...].copy()
-
+        img, alpha, trimap = self.augment(img, alpha, trimap)
 
         img = torch.from_numpy(img.astype(np.float32)).permute(2, 0, 1)
-        mask = torch.from_numpy(mask.astype(np.float32)[np.newaxis, :, :])
+        alpha = torch.from_numpy(alpha.astype(np.float32)[np.newaxis, :, :])
         trimap = torch.from_numpy(trimap.astype(np.float32)[np.newaxis, :, :])
 
         img = img / 255.0
-        img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(img)
+        img = img - 0.5
+        img = img / 0.5
+
+        return alpha_path, img, trimap, alpha
+    
+    def resize_and_crop(self, img, alpha, ref_size = 512, random_scale = 1.5):
+        # 将短边缩短到512
+        im_h, im_w, im_c = img.shape
+        # 非标准512x512图片，resize到短边为ref_size~ref_size*random_scale
+        # 然后center crop 或 random crop
+        if not (im_h == ref_size and im_w == ref_size):
+            random_size = np.random.randint(ref_size, int(ref_size * random_scale))
+            if im_w >= im_h:
+                im_rh = random_size
+                im_rw = int(im_w / im_h * random_size)
+            elif im_w < im_h:
+                im_rw = random_size
+                im_rh = int(im_h / im_w * random_size)
+
+            img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+            alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+
+            if np.random.random() < 0.2:
+                # center crop
+                x0 = (im_rw - ref_size) // 2
+                y0 = (im_rh - ref_size) // 2
+                img = img[y0:y0+ref_size, x0:x0+ref_size, ...]
+                alpha = alpha[y0:y0+ref_size, x0:x0+ref_size, ...]
+            else:
+                # random crop
+                x0 = random.randint(0, im_rw - ref_size)
+                y0 = random.randint(0, im_rh - ref_size)
+                img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+                alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
         
-        return self.imgs[index], img, trimap, mask
+        return img, alpha
+    
+    def augment(self, img, alpha, trimap):
+        # 左右镜像增广
+        if np.random.binomial(1, 0.5) > 0:
+            img = img[:, ::-1, ...]
+            alpha = alpha[:, ::-1, ...]
+            trimap = trimap[:, ::-1, ...]
+        
+        return img, alpha, trimap
+    
 
 
     
