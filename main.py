@@ -116,4 +116,9 @@ if __name__ == '__main__':
         "images",
         "masks",
         ref_size=512)
+    dataset.add_samples(
+        "/home/ubuntu/data/yong/projects/MODNet/data/PPM-100",
+        "image",
+        "matte"
+    )
     main(dataset, resume=True)

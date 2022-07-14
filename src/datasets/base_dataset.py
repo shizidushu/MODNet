@@ -12,7 +12,7 @@ from PIL import Image
 import glob
 
 class BaseDataset(Dataset):
-    def __init__(self, root_dir, img_dir = "image", alpha_dir = "masks", ref_size = 512):
+    def __init__(self, root_dir, img_dir = "images", alpha_dir = "masks", ref_size = 512):
         self.root_dir = root_dir
         self.img_dir = img_dir
         self.alpha_dir = alpha_dir
@@ -35,6 +35,7 @@ class BaseDataset(Dataset):
                 "img_path": img_path,
                 "alpha_path": alpha_path
             })
+        print(f"{len(self.samples)} samples")
 
     def gen_trimap(self, alpha):
         foreground = alpha > 0
