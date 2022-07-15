@@ -63,7 +63,6 @@ class BaseDataset(Dataset):
     def __getitem__(self, index):
         img_path = self.samples[index]["img_path"]
         alpha_path = self.samples[index]["alpha_path"]
-
         img = Image.open(img_path)
         img = np.asarray(img)
         if len(img.shape) == 2:
@@ -74,6 +73,9 @@ class BaseDataset(Dataset):
             img = img[:, :, 0:3]
 
         alpha = np.array(Image.open(alpha_path))
+        if alpha.shape[-1] == 4:
+            if len(np.unique(alpha[..., -1])) == 1:
+                alpha = alpha[..., :-1]
         alpha = alpha[..., -1] if len(alpha.shape) > 2 else alpha
         
         img, alpha = self.resize_and_crop(img, alpha, self.ref_size)

@@ -137,4 +137,9 @@ if __name__ == '__main__':
         "JPEGImages",
         "SegmentationClassPNG"
     )
+    dataset.add_samples(
+        "/home/ubuntu/data/yong/dataset/segmentation_full_body_mads_dataset_1192_img",
+        "images",
+        "masks"
+    )
     main(dataset, resume=True)
