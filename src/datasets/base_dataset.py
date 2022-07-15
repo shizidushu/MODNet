@@ -112,20 +112,47 @@ class BaseDataset(Dataset):
             img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
             alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
 
-            if np.random.random() < 0.2:
-                # center crop
-                x0 = (im_rw - ref_size) // 2
-                y0 = (im_rh - ref_size) // 2
-                img = img[y0:y0+ref_size, x0:x0+ref_size, ...]
-                alpha = alpha[y0:y0+ref_size, x0:x0+ref_size, ...]
-            else:
-                # random crop
-                x0 = random.randint(0, im_rw - ref_size)
-                y0 = random.randint(0, im_rh - ref_size)
-                img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
-                alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+            # if np.random.random() < 0.2:
+            #     # center crop
+            #     x0 = (im_rw - ref_size) // 2
+            #     y0 = (im_rh - ref_size) // 2
+            #     img = img[y0:y0+ref_size, x0:x0+ref_size, ...]
+            #     alpha = alpha[y0:y0+ref_size, x0:x0+ref_size, ...]
+            # else:
+            # random crop
+            x0 = random.randint(0, im_rw - ref_size)
+            y0 = random.randint(0, im_rh - ref_size)
+            img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+            alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
         
         return img, alpha
+    
+    def simple_resize_and_crop(self, img, alpha, ref_size = 512):
+        # 将短边缩短到512
+        im_h, im_w, im_c = img.shape
+        if im_w >= im_h:
+            im_rh = ref_size
+            im_rw = int(im_w / im_h * ref_size)
+        elif im_w < im_h:
+            im_rw = ref_size
+            im_rh = int(im_h / im_w * ref_size)
+
+        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+
+        # 随机裁剪出512x512
+        bigger_side = max(im_rw, im_rh)
+        rand_ind = random.randint(0, bigger_side - ref_size)
+
+        if im_rh > im_rw:
+            img = img[rand_ind:rand_ind+ref_size, :]
+            alpha = alpha[rand_ind:rand_ind+ref_size, :]
+        else:
+            img = img[:, rand_ind:rand_ind+ref_size]
+            alpha = alpha[:, rand_ind:rand_ind+ref_size]
+        
+        return img, alpha
+    
     
     def augment(self, img, alpha, trimap):
         # 左右镜像增广

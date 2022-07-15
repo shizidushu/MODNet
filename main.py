@@ -32,7 +32,7 @@ def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', 
         modnet.load_state_dict(torch.load(last_checkpoint))
     
     bs = batch_size  # batch size
-    lr = 0.0001  # learn rate
+    lr = 0.001  # learn rate
     epochs = 1000  # total epochs
     num_workers = 16
     optimizer = torch.optim.SGD(modnet.parameters(), lr=lr, momentum=0.9)
@@ -46,6 +46,7 @@ def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', 
         start_epoch = 0
 
     for epoch in range(start_epoch, epochs):
+        lr_scheduler.step(epoch=start_epoch)
         mattes = []
         for idx, (img_file, image, trimap, gt_matte) in enumerate(dataloader):
             image = image.cuda()
@@ -61,7 +62,7 @@ def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', 
             mattes.append(float(matte_loss))
         avg_matte = float(np.mean(mattes))
         logging.info(f"epoch: {epoch}/{epochs}, matte_loss: {avg_matte}")
-        lr_scheduler.step()
+        # lr_scheduler.step()
         torch.save(modnet.state_dict(), os.path.join(output_dir, 'matting_{:0>4d}.ckpt'.format(epoch)))
         print(f'----------{epoch}--------------save model over-----------------------------------')
         logging.info(f'------save model------{epoch}  {epoch}.ckpt')
@@ -125,5 +126,15 @@ if __name__ == '__main__':
         "/home/ubuntu/data/yong/dataset/Human-Segmentation-Dataset",
         "Training_Images",
         "Ground_Truth"
+    )
+    dataset.add_samples(
+        "/home/ubuntu/data/yong/projects/P3M/data/P3M-10k/train",
+        "blurred_image",
+        "mask"
+    )
+    dataset.add_samples(
+        "/home/ubuntu/data/yong/dataset/human_matting_dataset_kaggle",
+        "JPEGImages",
+        "SegmentationClassPNG"
     )
     main(dataset, resume=True)
