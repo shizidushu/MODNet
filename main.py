@@ -75,7 +75,7 @@ def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', 
         logging.info(f'------save model------{epoch}  {epoch}.ckpt')
 
 
-def train_soc(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output'):
+def main_soc(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output'):
     modnet = MODNet()
     modnet = nn.DataParallel(modnet)
 
@@ -100,9 +100,18 @@ def train_soc(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/outp
         semantic_loss=[]
         detail_loss=[]
         backup_modnet = copy.deepcopy(modnet)
-        for idx, (img_file, image, trimap, gt_matte) in enumerate(dataloader):
+        for idx, (img_file, weight, image, trimap, gt_matte) in enumerate(dataloader):
             image = image.cuda()
-            soc_semantic_loss, soc_detail_loss = soc_adaptation_iter(modnet, backup_modnet, optimizer, image)
+
+            semantic_scale=float((10.0 * torch.mean(weight)).numpy())
+            detail_scale=float((10.0 * torch.mean(weight)).numpy())
+            matte_scale=float((1.0 * torch.mean(weight)).numpy())
+            soc_semantic_loss, soc_detail_loss = soc_adaptation_iter(
+                modnet, backup_modnet, optimizer, image,
+                semantic_scale = semantic_scale,
+                detail_scale = detail_scale,
+                matte_scale = matte_scale
+            )
 
             info = f"epoch: {epoch}/{epochs} soc_semantic_loss: {soc_semantic_loss}, soc_detail_loss: {soc_detail_loss}"
             if soc_semantic_loss > 1 or soc_detail_loss>1:
