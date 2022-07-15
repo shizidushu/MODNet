@@ -29,7 +29,9 @@ class BaseDataset(Dataset):
             if not os.path.exists(img_path):
                 img_path = img_path.replace('.jpg', '.png')
             if not os.path.exists(img_path):
-                print(f"Not found image for mask file: {alpha_path}")
+                img_path = img_path.replace('-profile.png', '.jpg')               
+            if not os.path.exists(img_path):
+                print(f"Not found image for mask file: {img_path}")
                 continue
             self.samples.append({
                 "img_path": img_path,
@@ -78,6 +80,9 @@ class BaseDataset(Dataset):
             if len(np.unique(alpha[..., -1])) == 1:
                 alpha = alpha[..., :-1]
         alpha = alpha[..., -1] if len(alpha.shape) > 2 else alpha
+
+        if 'profile' in self.samples[index]["alpha_path"]:
+            alpha = 255 - alpha
         
         img, alpha = self.resize_and_crop(img, alpha, self.ref_size)
 

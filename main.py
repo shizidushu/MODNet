@@ -36,7 +36,7 @@ def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', 
     epochs = 1000  # total epochs
     num_workers = 16
     optimizer = torch.optim.SGD(modnet.parameters(), lr=lr, momentum=0.9)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50,
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100,
                                                    gamma=0.1)  # step_size 学习率下降迭代间隔次数， default: 每10次降低一次学习率
     dataloader = DataLoader(dataset, batch_size=bs, num_workers=num_workers, pin_memory=True)
 
@@ -147,6 +147,11 @@ if __name__ == '__main__':
         "Ground_Truth",
         sample_weight=1.0
     )
+    dataset.add_samples(
+        "/home/ubuntu/data/yong/dataset/people_segmentation",
+        "images",
+        "profiles",
+        sample_weight=1.0)
     dataset.add_samples(
         "/home/ubuntu/data/yong/projects/P3M/data/P3M-10k/train",
         "blurred_image",
