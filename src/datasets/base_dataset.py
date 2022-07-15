@@ -50,8 +50,7 @@ class BaseDataset(Dataset):
         bbox_size = ((right - left) + (ylower - upper)) // 2
         d_size = bbox_size // 256 * random.randint(10, 20)  # dilate kernel size
         e_size = bbox_size // 256 * random.randint(10, 20)  # erode kernel size
-        if np.amax(alpha) > 1:
-            alpha = alpha / 255.0 # numpy array of your matte (with values between [0, 1])
+        
         trimap = (alpha >= 0.9).astype('float32')
         not_bg = (alpha > 0).astype('float32')
         trimap[np.where(
@@ -78,6 +77,9 @@ class BaseDataset(Dataset):
         alpha = alpha[..., -1] if len(alpha.shape) > 2 else alpha
         
         img, alpha = self.resize_and_crop(img, alpha, self.ref_size)
+
+        if np.amax(alpha) > 1:
+            alpha = alpha / 255.0 # numpy array of your matte (with values between [0, 1])
         
         trimap = self.gen_trimap(alpha)
 

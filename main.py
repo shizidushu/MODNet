@@ -32,11 +32,11 @@ def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', 
         modnet.load_state_dict(torch.load(last_checkpoint))
     
     bs = batch_size  # batch size
-    lr = 0.001  # learn rate
+    lr = 0.0001  # learn rate
     epochs = 1000  # total epochs
     num_workers = 16
     optimizer = torch.optim.SGD(modnet.parameters(), lr=lr, momentum=0.9)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10,
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50,
                                                    gamma=0.1)  # step_size 学习率下降迭代间隔次数， default: 每10次降低一次学习率
     dataloader = DataLoader(dataset, batch_size=bs, num_workers=num_workers, pin_memory=True)
 
@@ -120,5 +120,10 @@ if __name__ == '__main__':
         "/home/ubuntu/data/yong/projects/MODNet/data/PPM-100",
         "image",
         "matte"
+    )
+    dataset.add_samples(
+        "/home/ubuntu/data/yong/dataset/Human-Segmentation-Dataset",
+        "Training_Images",
+        "Ground_Truth"
     )
     main(dataset, resume=True)
