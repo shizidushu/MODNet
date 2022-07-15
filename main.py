@@ -48,16 +48,23 @@ def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', 
     for epoch in range(start_epoch, epochs):
         lr_scheduler.step(epoch=start_epoch)
         mattes = []
-        for idx, (img_file, image, trimap, gt_matte) in enumerate(dataloader):
+        for idx, (mask_file, weight, image, trimap, gt_matte) in enumerate(dataloader):
             image = image.cuda()
             gt_matte = gt_matte.cuda()
             trimap = trimap.cuda()
+
+            semantic_scale=float((10.0 * torch.mean(weight)).numpy())
+            detail_scale=float((10.0 * torch.mean(weight)).numpy())
+            matte_scale=float((1.0 * torch.mean(weight)).numpy())
             semantic_loss, detail_loss, matte_loss = supervised_training_iter(
-                modnet, optimizer, image, trimap, gt_matte
+                modnet, optimizer, image, trimap, gt_matte,
+                semantic_scale = semantic_scale,
+                detail_scale = detail_scale,
+                matte_scale = matte_scale
             )
             info = f"epoch: {epoch}/{epochs} semantic_loss: {semantic_loss}, detail_loss: {detail_loss}, matte_loss: {matte_loss}"
             if semantic_loss > 1 or detail_loss > 1 or matte_loss > 1:
-                logging.info(img_file)
+                logging.info(mask_file)
             print(idx, info, optimizer.param_groups[0]['lr'])
             mattes.append(float(matte_loss))
         avg_matte = float(np.mean(mattes))
@@ -120,26 +127,31 @@ if __name__ == '__main__':
     dataset.add_samples(
         "/home/ubuntu/data/yong/projects/MODNet/data/PPM-100",
         "image",
-        "matte"
+        "matte",
+        sample_weight=1.0
     )
     dataset.add_samples(
         "/home/ubuntu/data/yong/dataset/Human-Segmentation-Dataset",
         "Training_Images",
-        "Ground_Truth"
+        "Ground_Truth",
+        sample_weight=0.9
     )
     dataset.add_samples(
         "/home/ubuntu/data/yong/projects/P3M/data/P3M-10k/train",
         "blurred_image",
-        "mask"
+        "mask",
+        sample_weight=0.6
     )
     dataset.add_samples(
         "/home/ubuntu/data/yong/dataset/human_matting_dataset_kaggle",
         "JPEGImages",
-        "SegmentationClassPNG"
+        "SegmentationClassPNG",
+        sample_weight=0.1
     )
     dataset.add_samples(
         "/home/ubuntu/data/yong/dataset/segmentation_full_body_mads_dataset_1192_img",
         "images",
-        "masks"
+        "masks",
+        sample_weight=0.1
     )
     main(dataset, resume=True)

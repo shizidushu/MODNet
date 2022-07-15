@@ -21,7 +21,7 @@ class BaseDataset(Dataset):
         self.samples = []
         self.add_samples(self.root_dir, self.img_dir, self.alpha_dir)
     
-    def add_samples(self, root_dir, img_dir = "image", alpha_dir = "masks"):
+    def add_samples(self, root_dir, img_dir = "image", alpha_dir = "masks", sample_weight = 1.0):
         alpha_path_pattern = os.path.sep.join([root_dir, alpha_dir, "*"])
         alpha_paths = sorted(glob.glob(alpha_path_pattern))
         for alpha_path in alpha_paths:
@@ -33,7 +33,8 @@ class BaseDataset(Dataset):
                 continue
             self.samples.append({
                 "img_path": img_path,
-                "alpha_path": alpha_path
+                "alpha_path": alpha_path,
+                "sample_weight": sample_weight
             })
         print(f"{len(self.samples)} samples")
 
@@ -95,7 +96,7 @@ class BaseDataset(Dataset):
         img = img - 0.5
         img = img / 0.5
 
-        return alpha_path, img, trimap, alpha
+        return alpha_path, self.samples[index]["sample_weight"], img, trimap, alpha
     
     def resize_and_crop(self, img, alpha, ref_size = 512, random_scale = 1.5):
         # 将短边缩短到512
