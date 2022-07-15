@@ -12,14 +12,14 @@ from PIL import Image
 import glob
 
 class BaseDataset(Dataset):
-    def __init__(self, root_dir, img_dir = "images", alpha_dir = "masks", ref_size = 512):
+    def __init__(self, root_dir, img_dir = "images", alpha_dir = "masks", ref_size = 512, sample_weight = 1.0):
         self.root_dir = root_dir
         self.img_dir = img_dir
         self.alpha_dir = alpha_dir
         self.ref_size = ref_size
 
         self.samples = []
-        self.add_samples(self.root_dir, self.img_dir, self.alpha_dir)
+        self.add_samples(self.root_dir, self.img_dir, self.alpha_dir, sample_weight = sample_weight)
     
     def add_samples(self, root_dir, img_dir = "image", alpha_dir = "masks", sample_weight = 1.0):
         alpha_path_pattern = os.path.sep.join([root_dir, alpha_dir, "*"])

@@ -132,7 +132,9 @@ if __name__ == '__main__':
         "/home/ubuntu/data/workspace/deeplabv3_plus/people_segmentation",
         "images",
         "masks",
-        ref_size=512)
+        ref_size=512,
+        sample_weight=2.0
+        )
     dataset.add_samples(
         "/home/ubuntu/data/yong/projects/MODNet/data/PPM-100",
         "image",
@@ -143,13 +145,13 @@ if __name__ == '__main__':
         "/home/ubuntu/data/yong/dataset/Human-Segmentation-Dataset",
         "Training_Images",
         "Ground_Truth",
-        sample_weight=0.9
+        sample_weight=1.0
     )
     dataset.add_samples(
         "/home/ubuntu/data/yong/projects/P3M/data/P3M-10k/train",
         "blurred_image",
         "mask",
-        sample_weight=0.6
+        sample_weight=0.5
     )
     dataset.add_samples(
         "/home/ubuntu/data/yong/dataset/human_matting_dataset_kaggle",
