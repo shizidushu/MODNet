@@ -84,7 +84,7 @@ blurer = GaussianBlurLayer(1, 3).cuda()
 
 
 def supervised_training_iter(
-    modnet, optimizer, image, trimap, gt_matte,
+    modnet, optimizer, weight, image, trimap, gt_matte,
     semantic_scale=10.0, detail_scale=10.0, matte_scale=1.0):
     """ Supervised training iteration of MODNet
     This function trains MODNet for one iteration in a labeled dataset.
@@ -148,21 +148,31 @@ def supervised_training_iter(
     # calculate the semantic loss
     gt_semantic = F.interpolate(gt_matte, scale_factor=1/16, mode='bilinear')
     gt_semantic = blurer(gt_semantic)
-    semantic_loss = torch.mean(F.mse_loss(pred_semantic, gt_semantic))
+    # semantic_loss = torch.mean(F.mse_loss(pred_semantic, gt_semantic))
+    semantic_loss = torch.mean(F.mse_loss(pred_semantic, gt_semantic, reduction='none'), dim=list(range(1, len(pred_semantic.size()))))
+    semantic_loss = torch.mean(semantic_loss * weight)
     semantic_loss = semantic_scale * semantic_loss
 
     # calculate the detail loss
     pred_boundary_detail = torch.where(boundaries, trimap, pred_detail)
     gt_detail = torch.where(boundaries, trimap, gt_matte)
-    detail_loss = torch.mean(F.l1_loss(pred_boundary_detail, gt_detail))
+    # detail_loss = torch.mean(F.l1_loss(pred_boundary_detail, gt_detail))
+    detail_loss = torch.mean(F.l1_loss(pred_boundary_detail, gt_detail, reduction='none'), dim=list(range(1, len(pred_boundary_detail.size()))))
+    detail_loss = torch.mean(detail_loss * weight)
     detail_loss = detail_scale * detail_loss
 
     # calculate the matte loss
     pred_boundary_matte = torch.where(boundaries, trimap, pred_matte)
-    matte_l1_loss = F.l1_loss(pred_matte, gt_matte) + 4.0 * F.l1_loss(pred_boundary_matte, gt_matte)
-    matte_compositional_loss = F.l1_loss(image * pred_matte, image * gt_matte) \
-        + 4.0 * F.l1_loss(image * pred_boundary_matte, image * gt_matte)
-    matte_loss = torch.mean(matte_l1_loss + matte_compositional_loss)
+    # matte_l1_loss = F.l1_loss(pred_matte, gt_matte) + 4.0 * F.l1_loss(pred_boundary_matte, gt_matte)
+    matte_l1_loss = torch.mean(F.l1_loss(pred_matte, gt_matte, reduction='none'), dim=list(range(1, len(pred_matte.size())))) + \
+        4.0 * torch.mean(F.l1_loss(pred_boundary_matte, gt_matte, reduction='none'), dim=list(range(1, len(pred_boundary_matte.size()))))
+    matte_l1_loss = torch.mean(matte_l1_loss * weight)
+
+    # matte_compositional_loss = F.l1_loss(image * pred_matte, image * gt_matte) + 4.0 * F.l1_loss(image * pred_boundary_matte, image * gt_matte)
+    matte_compositional_loss = torch.mean(F.l1_loss(image * pred_matte, image * gt_matte, reduction='none'), dim=list(range(1, len(image.size())))) + 4.0 * torch.mean(F.l1_loss(image * pred_boundary_matte, image * gt_matte, reduction='none'), dim=list(range(1, len(image.size()))))
+    matte_compositional_loss = torch.mean(matte_compositional_loss * weight)
+
+    matte_loss = torch.mean(matte_l1_loss  + matte_compositional_loss)
     matte_loss = matte_scale * matte_loss
 
     # calculate the final loss, backward the loss, and update the model 
