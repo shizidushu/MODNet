@@ -120,18 +120,25 @@ class BaseDataset(Dataset):
             img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
             alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
 
-            # if np.random.random() < 0.2:
-            #     # center crop
-            #     x0 = (im_rw - ref_size) // 2
-            #     y0 = (im_rh - ref_size) // 2
-            #     img = img[y0:y0+ref_size, x0:x0+ref_size, ...]
-            #     alpha = alpha[y0:y0+ref_size, x0:x0+ref_size, ...]
-            # else:
-            # random crop
-            x0 = random.randint(0, im_rw - ref_size)
-            y0 = random.randint(0, im_rh - ref_size)
-            img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
-            alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+            # # center crop
+            # x0 = (im_rw - ref_size) // 2
+            # y0 = (im_rh - ref_size) // 2
+            # img = img[y0:y0+ref_size, x0:x0+ref_size, ...]
+            # alpha = alpha[y0:y0+ref_size, x0:x0+ref_size, ...]
+
+            if np.random.random() < 0.2:
+                # crop center in x and bottom in y
+                # This may give more weights to foot
+                x0 = (im_rw - ref_size) // 2
+                y0 = im_rh - ref_size
+                img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+                alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+            else:
+                # random crop
+                x0 = random.randint(0, im_rw - ref_size)
+                y0 = random.randint(0, im_rh - ref_size)
+                img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+                alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
         
         return img, alpha
     
