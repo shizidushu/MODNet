@@ -66,6 +66,7 @@ class BaseDataset(Dataset):
     def __getitem__(self, index):
         img_path = self.samples[index]["img_path"]
         alpha_path = self.samples[index]["alpha_path"]
+        # print(alpha_path)
         img = Image.open(img_path)
         img = np.asarray(img)
         if len(img.shape) == 2:
@@ -84,10 +85,9 @@ class BaseDataset(Dataset):
         if 'profile' in self.samples[index]["alpha_path"]:
             alpha = 255 - alpha
         
-        # img, alpha = self.simple_resize_and_crop(img, alpha, self.ref_size)
-        img = cv2.resize(img, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
-        alpha = cv2.resize(alpha, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
-
+        img, alpha = self.resize_and_crop_by_alpha(img, alpha, self.ref_size)
+        # img = cv2.resize(img, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
+        # alpha = cv2.resize(alpha, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
 
         if np.amax(alpha) > 1:
             alpha = alpha / 255.0 # numpy array of your matte (with values between [0, 1])
@@ -179,6 +179,53 @@ class BaseDataset(Dataset):
         
         return img, alpha
     
+    def resize_and_crop_by_alpha(self, img, alpha, ref_size = 512, random_scale = 1.5):
+        rect = get_bbox(alpha)
+        rect_width = rect[2] - rect[0]
+        rect_height = rect[3] - rect[1]
+
+        im_h, im_w, im_c = img.shape
+
+        # 先取alpha的BBOX
+        ## 如果BBOX的长边过小(不足ref_size的一半），则放大BBOX长边到(ref_size // 2, ref_size)
+        random_size = np.random.randint(ref_size // 2, ref_size - 1)
+        if rect_width >= rect_height:
+            r_scale = random_size / rect_width
+        else:
+            r_scale = random_size / rect_height
+        r_scale = 1 if r_scale < 1 else r_scale
+        im_rw = int(im_w * r_scale)
+        im_rh = int(im_h * r_scale)
+        # print(f'phase 1: {im_rh, im_rw}')
+        ## 如果放大后的图片短边不足ref_size，或者之前没有放大
+        ## 则将图片短边Resize到(ref_size, ref_size * 1.5)
+        if min(im_rh, im_rw) < ref_size or r_scale == 1:
+            random_size = np.random.randint(ref_size, int(ref_size * random_scale))
+            if im_rw >= im_rh:
+                im_rw = int(im_rw / im_rh * random_size)
+                im_rh = random_size
+            elif im_rw < im_rh:
+                im_rh = int(im_rh / im_rw * random_size)
+                im_rw = random_size
+            # print(f'phase 2: {im_rh, im_rw}')
+        
+        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+        rect = get_bbox(alpha)
+        rect_width = rect[2] - rect[0]
+        rect_height = rect[3] - rect[1]
+        # print(rect)
+        # print(f'new rect height, wdith: {rect_height, rect_width}')
+
+        # random crop
+        x0 = random.randint(max(0, rect[0] - ref_size), min(im_rw - ref_size, rect[2]))
+        y0 = random.randint(max(0, rect[1] - ref_size), min(im_rh - ref_size, rect[3]))
+
+        img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+        alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+        
+        return img, alpha
+        
     
     def augment(self, img, alpha, trimap):
         # 左右镜像增广
@@ -191,4 +238,13 @@ class BaseDataset(Dataset):
     
 
 
-    
+
+def get_bbox(alpha):
+    foreground = alpha > 0.0
+    res = None
+    res = Image.fromarray(foreground).getbbox()
+    if res is None:
+        left, upper, right, ylower = 0, 0, alpha.shape[1], alpha.shape[0]
+    else:
+        left, upper, right, ylower = res
+    return (left, upper, right, ylower)
