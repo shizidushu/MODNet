@@ -85,7 +85,7 @@ class BaseDataset(Dataset):
         if 'profile' in self.samples[index]["alpha_path"]:
             alpha = 255 - alpha
         
-        img, alpha = self.resize_and_crop_by_alpha(img, alpha, self.ref_size)
+        img, alpha = self.resize_and_crop_by_bbox(img, alpha, self.ref_size)
         # img = cv2.resize(img, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
         # alpha = cv2.resize(alpha, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
 
@@ -227,6 +227,48 @@ class BaseDataset(Dataset):
         return img, alpha
         
     
+    def resize_and_crop_by_bbox(self, img, alpha, ref_size = 512, random_scale = 1.5):
+        rect = get_bbox(alpha)
+        rect_width = rect[2] - rect[0]
+        rect_height = rect[3] - rect[1]
+
+        im_h, im_w, im_c = img.shape
+
+        # 将BBOX裁剪出来
+        width_pad = int(rect_width / 4.0)
+        height_pad = int(rect_height / 4.0)
+        x_start = max(rect[0] - width_pad, 0)
+        x_end = min(rect[2] + width_pad, im_w - 1)
+        y_start = max(rect[1] - height_pad, 0)
+        y_end = min(rect[3] + height_pad, im_h - 1)
+
+        img = img[y_start:y_end, x_start:x_end, ...]
+        alpha = alpha[y_start:y_end, x_start:x_end, ...]
+
+        # 将短边缩短到512
+        im_h, im_w, im_c = img.shape
+        # 非标准512x512图片，resize到短边为ref_size~ref_size*random_scale
+        # 然后center crop 或 random crop
+        if not (im_h == ref_size and im_w == ref_size):
+            random_size = np.random.randint(ref_size, int(ref_size * random_scale))
+            if im_w >= im_h:
+                im_rh = random_size
+                im_rw = int(im_w / im_h * random_size)
+            elif im_w < im_h:
+                im_rw = random_size
+                im_rh = int(im_h / im_w * random_size)
+
+        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+
+        # random crop
+        x0 = random.randint(0, im_rw - ref_size)
+        y0 = random.randint(0, im_rh - ref_size)
+        img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+        alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+        
+        return img, alpha
+
     def augment(self, img, alpha, trimap):
         # 左右镜像增广
         if np.random.binomial(1, 0.5) > 0:
@@ -236,8 +278,6 @@ class BaseDataset(Dataset):
         
         return img, alpha, trimap
     
-
-
 
 def get_bbox(alpha):
     foreground = alpha > 0.0
