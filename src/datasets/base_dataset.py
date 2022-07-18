@@ -84,7 +84,10 @@ class BaseDataset(Dataset):
         if 'profile' in self.samples[index]["alpha_path"]:
             alpha = 255 - alpha
         
-        img, alpha = self.resize_and_crop(img, alpha, self.ref_size)
+        # img, alpha = self.simple_resize_and_crop(img, alpha, self.ref_size)
+        img = cv2.resize(img, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
+        alpha = cv2.resize(alpha, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
+
 
         if np.amax(alpha) > 1:
             alpha = alpha / 255.0 # numpy array of your matte (with values between [0, 1])
@@ -126,19 +129,18 @@ class BaseDataset(Dataset):
             # img = img[y0:y0+ref_size, x0:x0+ref_size, ...]
             # alpha = alpha[y0:y0+ref_size, x0:x0+ref_size, ...]
 
-            if np.random.random() < 0.2:
-                # crop center in x and bottom in y
-                # This may give more weights to foot
-                x0 = (im_rw - ref_size) // 2
-                y0 = im_rh - ref_size
-                img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
-                alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
-            else:
-                # random crop
-                x0 = random.randint(0, im_rw - ref_size)
-                y0 = random.randint(0, im_rh - ref_size)
-                img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
-                alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+            # crop center in x and bottom in y
+            # This may give more weights to foot
+            # x0 = (im_rw - ref_size) // 2
+            # y0 = im_rh - ref_size
+            # img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+            # alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+
+            # random crop
+            x0 = random.randint(0, im_rw - ref_size)
+            y0 = random.randint(0, im_rh - ref_size)
+            img = img[y0:y0 + ref_size, x0:x0 + ref_size, ...]
+            alpha = alpha[y0:y0 + ref_size, x0:x0 + ref_size, ...]
         
         return img, alpha
     
@@ -155,16 +157,25 @@ class BaseDataset(Dataset):
         img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
         alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
 
-        # 随机裁剪出512x512
-        bigger_side = max(im_rw, im_rh)
-        rand_ind = random.randint(0, bigger_side - ref_size)
-
+        # prefer center or bottom
         if im_rh > im_rw:
-            img = img[rand_ind:rand_ind+ref_size, :]
-            alpha = alpha[rand_ind:rand_ind+ref_size, :]
+            y0 = im_rh - ref_size
+            img = img[y0:y0+ref_size, :]
+            alpha = alpha[y0:y0+ref_size, :]
         else:
-            img = img[:, rand_ind:rand_ind+ref_size]
-            alpha = alpha[:, rand_ind:rand_ind+ref_size]
+            x0 = (im_rw - ref_size) // 2
+            img = img[:, x0:x0+ref_size]
+            alpha = alpha[:, x0:x0+ref_size]
+
+        # 随机裁剪出512x512
+        # bigger_side = max(im_rw, im_rh)
+        # rand_ind = random.randint(0, bigger_side - ref_size)
+        # if im_rh > im_rw:
+        #     img = img[rand_ind:rand_ind+ref_size, :]
+        #     alpha = alpha[rand_ind:rand_ind+ref_size, :]
+        # else:
+        #     img = img[:, rand_ind:rand_ind+ref_size]
+        #     alpha = alpha[:, rand_ind:rand_ind+ref_size]
         
         return img, alpha
     
