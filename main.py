@@ -40,7 +40,7 @@ def main(dataset, output_dir = '/home/ubuntu/data/yong/projects/MODNet/output', 
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50,
     #                                                gamma=0.1)  # step_size 学习率下降迭代间隔次数， default: 每10次降低一次学习率
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2)
-    dataloader = DataLoader(dataset, batch_size=bs, shuffle = False, num_workers=num_workers, pin_memory=True)
+    dataloader = DataLoader(dataset, batch_size=bs, shuffle = True, num_workers=num_workers, pin_memory=True)
 
     if resume and last_checkpoint is not None:
         start_epoch = int(last_checkpoint.split('_')[1]) + 1

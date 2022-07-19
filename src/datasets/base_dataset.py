@@ -86,8 +86,8 @@ class BaseDataset(Dataset):
             alpha = 255 - alpha
         
         img, alpha = self.resize_and_crop_by_bbox(img, alpha, self.ref_size)
-        # img = cv2.resize(img, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
-        # alpha = cv2.resize(alpha, (self.ref_size, self.ref_size), interpolation=cv2.INTER_LINEAR)
+        # img = cv2.resize(img, (self.ref_size, self.ref_size), interpolation=cv2.INTER_CUBIC)
+        # alpha = cv2.resize(alpha, (self.ref_size, self.ref_size), interpolation=cv2.INTER_CUBIC)
 
         if np.amax(alpha) > 1:
             alpha = alpha / 255.0 # numpy array of your matte (with values between [0, 1])
@@ -120,8 +120,8 @@ class BaseDataset(Dataset):
                 im_rw = random_size
                 im_rh = int(im_h / im_w * random_size)
 
-            img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
-            alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+            img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_CUBIC)
+            alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_CUBIC)
 
             # # center crop
             # x0 = (im_rw - ref_size) // 2
@@ -154,8 +154,8 @@ class BaseDataset(Dataset):
             im_rw = ref_size
             im_rh = int(im_h / im_w * ref_size)
 
-        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
-        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_CUBIC)
+        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_CUBIC)
 
         # prefer center or bottom
         if im_rh > im_rw:
@@ -209,8 +209,8 @@ class BaseDataset(Dataset):
                 im_rw = random_size
             # print(f'phase 2: {im_rh, im_rw}')
         
-        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
-        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_CUBIC)
+        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_CUBIC)
         rect = get_bbox(alpha)
         rect_width = rect[2] - rect[0]
         rect_height = rect[3] - rect[1]
@@ -236,32 +236,32 @@ class BaseDataset(Dataset):
 
         # 解决图片中人所占比例过小，使得裁剪时都能裁剪到人
         ## 将BBOX裁剪出来，H和W最多再各取rect对应一半
-        width_pad = int(rect_width / 4.0)
-        height_pad = int(rect_height / 4.0)
-        x_start = max(rect[0] - width_pad, 0)
-        x_end = min(rect[2] + width_pad, im_w - 1)
-        y_start = max(rect[1] - height_pad, 0)
-        y_end = min(rect[3] + height_pad, im_h - 1)
-        img = img[y_start:y_end, x_start:x_end, ...]
-        alpha = alpha[y_start:y_end, x_start:x_end, ...]
-
-        ## 将BBOX裁剪出来，H和W最多再各取rect长边的一半
-        # width_pad = int(rect_width / 2.0)
-        # height_pad = int(rect_height / 2.0)
-        # pad_for_long_side = max(width_pad, height_pad)
-        # pad_for_short_side = pad_for_long_side + int(abs(rect_height - rect_width) / 2.0)
-        # if im_h >= im_w:
-        #     x_start = max(rect[0] - pad_for_short_side, 0)
-        #     x_end = min(rect[2] + pad_for_short_side, im_w - 1)
-        #     y_start = max(rect[1] - pad_for_long_side, 0)
-        #     y_end = min(rect[3] + pad_for_long_side, im_h - 1)
-        # else:
-        #     x_start = max(rect[0] - pad_for_long_side, 0)
-        #     x_end = min(rect[2] + pad_for_long_side, im_w - 1)
-        #     y_start = max(rect[1] - pad_for_short_side, 0)
-        #     y_end = min(rect[3] + pad_for_short_side, im_h - 1)
+        # width_pad = int(rect_width / 4.0)
+        # height_pad = int(rect_height / 4.0)
+        # x_start = max(rect[0] - width_pad, 0)
+        # x_end = min(rect[2] + width_pad, im_w - 1)
+        # y_start = max(rect[1] - height_pad, 0)
+        # y_end = min(rect[3] + height_pad, im_h - 1)
         # img = img[y_start:y_end, x_start:x_end, ...]
         # alpha = alpha[y_start:y_end, x_start:x_end, ...]
+
+        ## 将BBOX裁剪出来，H和W最多再各取rect长边的一半
+        width_pad = int(rect_width / 2.0)
+        height_pad = int(rect_height / 2.0)
+        pad_for_long_side = max(width_pad, height_pad)
+        pad_for_short_side = pad_for_long_side + int(abs(rect_height - rect_width) / 2.0)
+        if im_h >= im_w:
+            x_start = max(rect[0] - pad_for_short_side, 0)
+            x_end = min(rect[2] + pad_for_short_side, im_w - 1)
+            y_start = max(rect[1] - pad_for_long_side, 0)
+            y_end = min(rect[3] + pad_for_long_side, im_h - 1)
+        else:
+            x_start = max(rect[0] - pad_for_long_side, 0)
+            x_end = min(rect[2] + pad_for_long_side, im_w - 1)
+            y_start = max(rect[1] - pad_for_short_side, 0)
+            y_end = min(rect[3] + pad_for_short_side, im_h - 1)
+        img = img[y_start:y_end, x_start:x_end, ...]
+        alpha = alpha[y_start:y_end, x_start:x_end, ...]
 
         # 将短边缩短
         im_h, im_w, im_c = img.shape
@@ -275,8 +275,8 @@ class BaseDataset(Dataset):
             im_rw = random_size
             im_rh = int(im_h / im_w * random_size)
 
-        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
-        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_LINEAR)
+        img = cv2.resize(img, (im_rw, im_rh), interpolation=cv2.INTER_CUBIC)
+        alpha = cv2.resize(alpha, (im_rw, im_rh), interpolation=cv2.INTER_CUBIC)
 
         # random crop
         x0 = random.randint(0, im_rw - ref_size)
