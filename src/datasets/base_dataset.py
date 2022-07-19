@@ -234,34 +234,36 @@ class BaseDataset(Dataset):
 
         im_h, im_w, im_c = img.shape
 
-        # 将BBOX裁剪出来，H和W最多再各取rect对应一半
-        # width_pad = int(rect_width / 4.0)
-        # height_pad = int(rect_height / 4.0)
-        # x_start = max(rect[0] - width_pad, 0)
-        # x_end = min(rect[2] + width_pad, im_w - 1)
-        # y_start = max(rect[1] - height_pad, 0)
-        # y_end = min(rect[3] + height_pad, im_h - 1)
+        # 解决图片中人所占比例过小，使得裁剪时都能裁剪到人
+        ## 将BBOX裁剪出来，H和W最多再各取rect对应一半
+        width_pad = int(rect_width / 4.0)
+        height_pad = int(rect_height / 4.0)
+        x_start = max(rect[0] - width_pad, 0)
+        x_end = min(rect[2] + width_pad, im_w - 1)
+        y_start = max(rect[1] - height_pad, 0)
+        y_end = min(rect[3] + height_pad, im_h - 1)
+        img = img[y_start:y_end, x_start:x_end, ...]
+        alpha = alpha[y_start:y_end, x_start:x_end, ...]
+
+        ## 将BBOX裁剪出来，H和W最多再各取rect长边的一半
+        # width_pad = int(rect_width / 2.0)
+        # height_pad = int(rect_height / 2.0)
+        # pad_for_long_side = max(width_pad, height_pad)
+        # pad_for_short_side = pad_for_long_side + int(abs(rect_height - rect_width) / 2.0)
+        # if im_h >= im_w:
+        #     x_start = max(rect[0] - pad_for_short_side, 0)
+        #     x_end = min(rect[2] + pad_for_short_side, im_w - 1)
+        #     y_start = max(rect[1] - pad_for_long_side, 0)
+        #     y_end = min(rect[3] + pad_for_long_side, im_h - 1)
+        # else:
+        #     x_start = max(rect[0] - pad_for_long_side, 0)
+        #     x_end = min(rect[2] + pad_for_long_side, im_w - 1)
+        #     y_start = max(rect[1] - pad_for_short_side, 0)
+        #     y_end = min(rect[3] + pad_for_short_side, im_h - 1)
         # img = img[y_start:y_end, x_start:x_end, ...]
         # alpha = alpha[y_start:y_end, x_start:x_end, ...]
 
-        # 将BBOX裁剪出来，H和W最多再各取rect长边的一半
-        width_pad = int(rect_width / 2.0)
-        height_pad = int(rect_height / 2.0)
-        pad_for_long_side = max(width_pad, height_pad)
-        pad_for_short_side = pad_for_long_side + int(abs(rect_height - rect_width) / 2.0)
-        if im_h >= im_w:
-            x_start = max(rect[0] - pad_for_short_side, 0)
-            x_end = min(rect[2] + pad_for_short_side, im_w - 1)
-            y_start = max(rect[1] - pad_for_long_side, 0)
-            y_end = min(rect[3] + pad_for_long_side, im_h - 1)
-        else:
-            x_start = max(rect[0] - pad_for_long_side, 0)
-            x_end = min(rect[2] + pad_for_long_side, im_w - 1)
-            y_start = max(rect[1] - pad_for_short_side, 0)
-            y_end = min(rect[3] + pad_for_short_side, im_h - 1)
-        alpha = alpha[y_start:y_end, x_start:x_end, ...]
-
-        # 将短边缩短到512
+        # 将短边缩短
         im_h, im_w, im_c = img.shape
         # 非标准512x512图片，resize到短边为ref_size~ref_size*random_scale
         # 然后center crop 或 random crop
